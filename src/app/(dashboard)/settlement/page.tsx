@@ -229,17 +229,12 @@ export default function SettlementPage() {
         confirmed_at: new Date().toISOString(),
       }));
 
-      // 기존 정산 데이터 삭제 후 새로 저장
-      await supabase
-        .from('monthly_settlements')
-        .delete()
-        .eq('store_id', selectedStoreId)
-        .eq('year', year)
-        .eq('month', month);
-
+      // upsert로 저장 (기존 데이터 있으면 업데이트)
       const { error } = await supabase
         .from('monthly_settlements')
-        .insert(settlementRecords);
+        .upsert(settlementRecords, {
+          onConflict: 'worker_id,year,month',
+        });
 
       if (error) throw error;
 
