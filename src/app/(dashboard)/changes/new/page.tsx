@@ -173,8 +173,8 @@ function NewChangeForm() {
       if (startTime && endTime) {
         calculatedMinutes = calculateMinutesBetween(startTime, endTime);
       }
-      // 식대/주휴수당은 시간(hours)을 분으로 변환
-      if (['meal_allowance', 'weekly_holiday_pay'].includes(changeType) && hours) {
+      // 식대/주휴수당/만근수당은 시간(hours)을 분으로 변환
+      if (['meal_allowance', 'weekly_holiday_pay', 'full_attendance_bonus'].includes(changeType) && hours) {
         calculatedMinutes = Math.round(parseFloat(hours) * 60);
       }
 
@@ -242,9 +242,15 @@ function NewChangeForm() {
 
       toast.success('변동사항이 등록되었습니다');
       router.push('/changes');
-    } catch (error) {
-      toast.error('등록에 실패했습니다');
-      console.error(error);
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : typeof error === 'object' && error !== null && 'message' in error
+          ? String((error as { message: unknown }).message)
+          : '알 수 없는 오류가 발생했습니다';
+      toast.error(`등록에 실패했습니다: ${errorMessage}`);
+      console.error('변동사항 등록 오류:', error);
     } finally {
       setIsLoading(false);
     }
