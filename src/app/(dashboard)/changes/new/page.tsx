@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useStoreSelection } from '@/lib/stores/useStoreSelection';
@@ -38,6 +38,14 @@ const CHANGE_TYPES: ChangeType[] = [
 ];
 
 export default function NewChangePage() {
+  return (
+    <Suspense fallback={<div className="p-4">로딩 중...</div>}>
+      <NewChangeForm />
+    </Suspense>
+  );
+}
+
+function NewChangeForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { selectedStoreId } = useStoreSelection();
