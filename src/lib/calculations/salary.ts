@@ -4,12 +4,15 @@ import { MonthlyWorkHours } from './workHours';
 export interface SalaryCalculation {
   // 시간 기반
   workMinutes: number;
+  workMinutesRounded: number;
   hourlyWage: number;
   baseWage: number;
 
   // 추가 지급
-  mealAllowance: number;
-  weeklyHolidayPay: number;
+  mealAllowanceHours: number; // 식대 시간
+  mealAllowanceWage: number; // 식대 금액 (시급 * 시간)
+  weeklyHolidayPayHours: number; // 주휴수당 시간
+  weeklyHolidayPayWage: number; // 주휴수당 금액
   fullAttendanceBonus: number;
 
   // 정산
@@ -17,6 +20,9 @@ export interface SalaryCalculation {
   taxRate: number;
   taxAmount: number;
   netWage: number;
+
+  // 올림 정보
+  hasRounding: boolean;
 }
 
 /**
@@ -25,6 +31,8 @@ export interface SalaryCalculation {
  * 세전급여 = 기본급 + 식대 + 주휴수당 + 만근보너스
  * 세금 = 세전급여 × 3.3% (적용 시)
  * 실수령 = 세전급여 - 세금
+ *
+ * 참고: 추가근무/대타는 0.5시간 단위로 올림 처리됨
  */
 export function calculateSalary(
   workHours: MonthlyWorkHours,
@@ -33,23 +41,29 @@ export function calculateSalary(
   changes: ScheduleChange[],
   isFullAttendance: boolean = false
 ): SalaryCalculation {
-  const { totalMinutes } = workHours;
+  const { totalMinutesRounded, hasRounding } = workHours;
   const hourlyWage = store.hourly_wage;
 
-  // 기본급 계산 (분 → 시간, 반올림)
-  const workHoursDecimal = totalMinutes / 60;
+  // 기본급 계산 (올림 적용된 시간 기준)
+  const workHoursDecimal = totalMinutesRounded / 60;
   const baseWage = Math.round(workHoursDecimal * hourlyWage);
 
   // 추가 지급 항목 집계
   const approvedChanges = changes.filter((c) => c.status === 'approved');
 
-  const mealAllowance = approvedChanges
+  // 식대: 시간(분) 기준으로 계산
+  const mealAllowanceMinutes = approvedChanges
     .filter((c) => c.change_type === 'meal_allowance')
-    .reduce((sum, c) => sum + (c.amount || 0), 0);
+    .reduce((sum, c) => sum + (c.minutes || 0), 0);
+  const mealAllowanceHours = mealAllowanceMinutes / 60;
+  const mealAllowanceWage = Math.round(mealAllowanceHours * hourlyWage);
 
-  const weeklyHolidayPay = approvedChanges
+  // 주휴수당: 시간(분) 기준으로 계산
+  const weeklyHolidayPayMinutes = approvedChanges
     .filter((c) => c.change_type === 'weekly_holiday_pay')
-    .reduce((sum, c) => sum + (c.amount || 0), 0);
+    .reduce((sum, c) => sum + (c.minutes || 0), 0);
+  const weeklyHolidayPayHours = weeklyHolidayPayMinutes / 60;
+  const weeklyHolidayPayWage = Math.round(weeklyHolidayPayHours * hourlyWage);
 
   const fullAttendanceBonus = isFullAttendance
     ? store.full_attendance_bonus
@@ -57,7 +71,7 @@ export function calculateSalary(
 
   // 세전 급여
   const grossWage =
-    baseWage + mealAllowance + weeklyHolidayPay + fullAttendanceBonus;
+    baseWage + mealAllowanceWage + weeklyHolidayPayWage + fullAttendanceBonus;
 
   // 세금 계산 (3.3% 사업소득세)
   const taxRate = worker.is_tax_applied ? 0.033 : 0;
@@ -67,16 +81,20 @@ export function calculateSalary(
   const netWage = grossWage - taxAmount;
 
   return {
-    workMinutes: totalMinutes,
+    workMinutes: workHours.totalMinutes,
+    workMinutesRounded: totalMinutesRounded,
     hourlyWage,
     baseWage,
-    mealAllowance,
-    weeklyHolidayPay,
+    mealAllowanceHours,
+    mealAllowanceWage,
+    weeklyHolidayPayHours,
+    weeklyHolidayPayWage,
     fullAttendanceBonus,
     grossWage,
     taxRate,
     taxAmount,
     netWage,
+    hasRounding,
   };
 }
 

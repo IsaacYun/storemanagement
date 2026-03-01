@@ -1,6 +1,8 @@
-import { Store, Worker, ScheduleChange } from '@/lib/supabase/types';
+import { Store, Worker, ScheduleChange, CHANGE_TYPE_LABELS } from '@/lib/supabase/types';
 import { MonthlyWorkHours, formatMinutesToHoursAndMinutes } from '@/lib/calculations/workHours';
 import { SalaryCalculation, formatMoney } from '@/lib/calculations/salary';
+import { format } from 'date-fns';
+import { ko } from 'date-fns/locale';
 
 export interface KakaoMessageOptions {
   worker: Worker;
@@ -9,6 +11,7 @@ export interface KakaoMessageOptions {
   month: number;
   salary: SalaryCalculation;
   workHours: MonthlyWorkHours;
+  changes?: ScheduleChange[];
 }
 
 /**
@@ -41,18 +44,20 @@ export function generateKakaoMessage(options: KakaoMessageOptions): string {
     message += `  조퇴: -${formatMinutesToHoursAndMinutes(workHours.earlyLeaveMinutes)}\n`;
   }
 
-  message += `  총 근무: ${formatMinutesToHoursAndMinutes(workHours.totalMinutes)}\n\n`;
+  message += `  총 근무: ${formatMinutesToHoursAndMinutes(workHours.totalMinutesRounded)}`;
+  if (workHours.hasRounding) message += ` (0.5시간 단위 올림 적용)`;
+  message += `\n\n`;
 
   // 급여 내역
   message += `▶ 급여 내역\n`;
   message += `  시급: ${formatMoney(salary.hourlyWage)}원\n`;
   message += `  기본급: ${formatMoney(salary.baseWage)}원\n`;
 
-  if (salary.mealAllowance > 0) {
-    message += `  식대: +${formatMoney(salary.mealAllowance)}원\n`;
+  if (salary.mealAllowanceWage > 0) {
+    message += `  식대: +${formatMoney(salary.mealAllowanceWage)}원 (${salary.mealAllowanceHours}시간)\n`;
   }
-  if (salary.weeklyHolidayPay > 0) {
-    message += `  주휴수당: +${formatMoney(salary.weeklyHolidayPay)}원\n`;
+  if (salary.weeklyHolidayPayWage > 0) {
+    message += `  주휴수당: +${formatMoney(salary.weeklyHolidayPayWage)}원 (${salary.weeklyHolidayPayHours}시간)\n`;
   }
   if (salary.fullAttendanceBonus > 0) {
     message += `  만근보너스: +${formatMoney(salary.fullAttendanceBonus)}원\n`;
@@ -67,6 +72,28 @@ export function generateKakaoMessage(options: KakaoMessageOptions): string {
 
   message += `\n`;
   message += `▶ 실수령액: ${formatMoney(salary.netWage)}원\n`;
+
+  // 변동사항 상세 목록 추가
+  if (options.changes && options.changes.length > 0) {
+    message += `\n▶ 변동사항 내역\n`;
+    options.changes.forEach((change) => {
+      const dateStr = format(new Date(change.work_date), 'M/d(EEE)', { locale: ko });
+      const typeLabel = CHANGE_TYPE_LABELS[change.change_type];
+
+      let detail = '';
+      if (change.start_time && change.end_time) {
+        detail = `${change.start_time.slice(0, 5)}-${change.end_time.slice(0, 5)}`;
+      } else if (change.minutes) {
+        detail = formatMinutesToHoursAndMinutes(change.minutes);
+      }
+
+      message += `  ${dateStr} ${typeLabel}`;
+      if (detail) message += ` (${detail})`;
+      if (change.note) message += ` - ${change.note}`;
+      message += `\n`;
+    });
+  }
+
   message += `━━━━━━━━━━━━━━━`;
 
   return message;

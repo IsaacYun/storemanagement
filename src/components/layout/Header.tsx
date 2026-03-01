@@ -23,7 +23,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Menu, LogOut, User, Settings } from 'lucide-react';
+import { Menu, LogOut, User, Settings, Store as StoreIcon } from 'lucide-react';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Sidebar } from './Sidebar';
 
@@ -33,6 +33,8 @@ export function Header() {
   const { selectedStoreId, setSelectedStore } = useStoreSelection();
   const [stores, setStores] = useState<Store[]>([]);
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  const selectedStore = stores.find((s) => s.id === selectedStoreId);
 
   useEffect(() => {
     const fetchStores = async () => {
@@ -45,7 +47,7 @@ export function Header() {
 
       if (data) {
         setStores(data);
-        // 첫 번째 매장 자동 선택
+        // 첫 번째 매장 자동 선택 (localStorage에 저장된 값이 없을 때만)
         if (!selectedStoreId && data.length > 0) {
           setSelectedStore(data[0].id);
         }
@@ -77,23 +79,34 @@ export function Header() {
         </Sheet>
 
         {/* 로고 */}
-        <Link href="/schedule/calendar" className="font-semibold text-lg">
+        <Link href="/schedule/calendar" className="font-semibold text-lg hidden sm:block">
           매장 근무 관리
         </Link>
 
-        {/* 매장 선택 */}
-        <Select value={selectedStoreId || ''} onValueChange={setSelectedStore}>
-          <SelectTrigger className="w-[140px]">
-            <SelectValue placeholder="매장 선택" />
-          </SelectTrigger>
-          <SelectContent>
-            {stores.map((store) => (
-              <SelectItem key={store.id} value={store.id}>
-                {store.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {/* 매장 선택 - 더 크고 눈에 띄게 */}
+        <div className="flex items-center gap-2 bg-blue-50 rounded-lg px-3 py-1.5 border border-blue-200">
+          <StoreIcon className="h-5 w-5 text-blue-600" />
+          <Select value={selectedStoreId || ''} onValueChange={setSelectedStore}>
+            <SelectTrigger className="w-auto min-w-[120px] border-0 bg-transparent text-blue-900 font-bold text-lg focus:ring-0 focus:ring-offset-0 p-0 h-auto">
+              <SelectValue placeholder="매장 선택">
+                {selectedStore?.name || '매장 선택'}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {stores.map((store) => (
+                <SelectItem key={store.id} value={store.id} className="text-base">
+                  <div className="flex items-center gap-2">
+                    <StoreIcon className="h-4 w-4" />
+                    <span className="font-medium">{store.name}</span>
+                    <span className="text-gray-400 text-sm">
+                      (시급 {store.hourly_wage.toLocaleString()}원)
+                    </span>
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
         <div className="flex-1" />
 
@@ -114,14 +127,16 @@ export function Header() {
               <User className="mr-2 h-4 w-4" />
               {worker?.name} ({isAdmin ? '관리자' : '근무자'})
             </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => router.push('/settings')}>
+              <User className="mr-2 h-4 w-4" />
+              프로필 설정
+            </DropdownMenuItem>
             {isAdmin && (
-              <>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => router.push('/admin/stores')}>
-                  <Settings className="mr-2 h-4 w-4" />
-                  관리 설정
-                </DropdownMenuItem>
-              </>
+              <DropdownMenuItem onClick={() => router.push('/admin/stores')}>
+                <Settings className="mr-2 h-4 w-4" />
+                관리 설정
+              </DropdownMenuItem>
             )}
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={handleLogout}>

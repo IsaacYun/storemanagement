@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useStoreSelection } from '@/lib/stores/useStoreSelection';
 import { useAuth } from '@/lib/stores/useAuth';
@@ -19,7 +19,7 @@ import {
 } from '@/components/ui/select';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { format } from 'date-fns';
+import { format, getDay } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { CalendarIcon, ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
@@ -38,6 +38,7 @@ const CHANGE_TYPES: ChangeType[] = [
 
 export default function NewChangePage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { selectedStoreId } = useStoreSelection();
   const { worker: currentWorker, isAdmin } = useAuth();
 
@@ -45,13 +46,20 @@ export default function NewChangePage() {
   const [stores, setStores] = useState<Store[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
+  // URL 쿼리 파라미터에서 초기값 가져오기
+  const initialWorkerId = searchParams.get('workerId');
+  const initialDate = searchParams.get('date');
+
   // 폼 상태
-  const [workerId, setWorkerId] = useState('');
-  const [workDate, setWorkDate] = useState<Date>();
+  const [workerId, setWorkerId] = useState(initialWorkerId || '');
+  const [workDate, setWorkDate] = useState<Date | undefined>(
+    initialDate ? new Date(initialDate) : undefined
+  );
   const [changeType, setChangeType] = useState<ChangeType>('absence');
   const [startTime, setStartTime] = useState('');
   const [endTime, setEndTime] = useState('');
   const [minutes, setMinutes] = useState('');
+  const [hours, setHours] = useState(''); // 식대, 주휴수당용 시간 (0.5 단위)
   const [amount, setAmount] = useState('');
   const [note, setNote] = useState('');
   const [workStoreId, setWorkStoreId] = useState('');
@@ -61,17 +69,28 @@ export default function NewChangePage() {
     const fetchData = async () => {
       const supabase = createClient();
 
-      const [workersRes, storesRes] = await Promise.all([
+      const [storeWorkersRes, adminWorkersRes, storesRes] = await Promise.all([
         supabase
           .from('workers')
           .select('*')
           .eq('store_id', selectedStoreId)
           .eq('is_active', true)
           .order('name'),
+        supabase
+          .from('workers')
+          .select('*')
+          .eq('role', 'admin')
+          .eq('is_active', true)
+          .neq('store_id', selectedStoreId),
         supabase.from('stores').select('*').eq('is_active', true).order('name'),
       ]);
 
-      setWorkers(workersRes.data || []);
+      // 매장 근무자 + 관리자 합치기
+      const allWorkers = [
+        ...(storeWorkersRes.data || []),
+        ...(adminWorkersRes.data || []),
+      ].sort((a, b) => a.name.localeCompare(b.name));
+      setWorkers(allWorkers);
       setStores(storesRes.data || []);
 
       // 기본값 설정
@@ -79,8 +98,8 @@ export default function NewChangePage() {
         setWorkStoreId(selectedStoreId);
       }
 
-      // 근무자는 본인만 선택 가능
-      if (!isAdmin && currentWorker) {
+      // 근무자는 본인만 선택 가능 (URL 파라미터가 없는 경우)
+      if (!isAdmin && currentWorker && !initialWorkerId) {
         setWorkerId(currentWorker.id);
       }
     };
@@ -102,10 +121,52 @@ export default function NewChangePage() {
     try {
       const supabase = createClient();
 
+      // 정산 완료된 월인지 체크
+      const year = workDate.getFullYear();
+      const month = workDate.getMonth() + 1;
+
+      const { data: confirmedSettlement } = await supabase
+        .from('monthly_settlements')
+        .select('id')
+        .eq('worker_id', workerId)
+        .eq('year', year)
+        .eq('month', month)
+        .eq('status', 'confirmed')
+        .maybeSingle();
+
+      if (confirmedSettlement) {
+        toast.error(`${year}년 ${month}월은 이미 정산이 완료되어 변동사항을 추가할 수 없습니다`);
+        setIsLoading(false);
+        return;
+      }
+
+      // 대타인 경우 원래 근무자도 정산 완료 체크 (미리 체크)
+      if (changeType === 'substitute' && originalWorkerId) {
+        const { data: originalWorkerSettlement } = await supabase
+          .from('monthly_settlements')
+          .select('id')
+          .eq('worker_id', originalWorkerId)
+          .eq('year', year)
+          .eq('month', month)
+          .eq('status', 'confirmed')
+          .maybeSingle();
+
+        if (originalWorkerSettlement) {
+          const originalWorkerName = workers.find((w) => w.id === originalWorkerId)?.name;
+          toast.error(`${originalWorkerName}님의 ${year}년 ${month}월은 이미 정산이 완료되어 변동사항을 추가할 수 없습니다`);
+          setIsLoading(false);
+          return;
+        }
+      }
+
       // 시간 계산
       let calculatedMinutes = parseInt(minutes) || 0;
       if (startTime && endTime) {
         calculatedMinutes = calculateMinutesBetween(startTime, endTime);
+      }
+      // 식대/주휴수당은 시간(hours)을 분으로 변환
+      if (['meal_allowance', 'weekly_holiday_pay'].includes(changeType) && hours) {
+        calculatedMinutes = Math.round(parseFloat(hours) * 60);
       }
 
       const changeData = {
@@ -117,7 +178,7 @@ export default function NewChangePage() {
         start_time: startTime || null,
         end_time: endTime || null,
         minutes: calculatedMinutes || null,
-        amount: parseInt(amount) || 0,
+        amount: 0, // 금액은 더 이상 사용하지 않음
         note: note || null,
         created_by: currentWorker?.id || null,
         status: isAdmin ? 'approved' : 'pending',
@@ -129,12 +190,41 @@ export default function NewChangePage() {
 
       // 대타인 경우 원래 근무자에게 미근무 자동 생성
       if (changeType === 'substitute' && originalWorkerId) {
+        // 원래 근무자의 해당 날짜 스케줄 시간 조회
+        const dayOfWeek = getDay(workDate);
+        const dateStr = format(workDate, 'yyyy-MM-dd');
+
+        const { data: originalWorkerSchedules } = await supabase
+          .from('schedules')
+          .select('*')
+          .eq('worker_id', originalWorkerId)
+          .eq('day_of_week', dayOfWeek)
+          .eq('is_active', true);
+
+        // 해당 날짜에 유효한 스케줄 찾기
+        let originalScheduleMinutes = calculatedMinutes; // 기본값은 대타 근무 시간
+        if (originalWorkerSchedules && originalWorkerSchedules.length > 0) {
+          // effective_from/to 체크해서 유효한 스케줄 찾기
+          const validSchedule = originalWorkerSchedules.find((s) => {
+            const afterStart = !s.effective_from || dateStr >= s.effective_from;
+            const beforeEnd = !s.effective_to || dateStr <= s.effective_to;
+            return afterStart && beforeEnd;
+          });
+
+          if (validSchedule) {
+            originalScheduleMinutes = calculateMinutesBetween(
+              validSchedule.start_time,
+              validSchedule.end_time
+            );
+          }
+        }
+
         await supabase.from('schedule_changes').insert({
           worker_id: originalWorkerId,
           work_date: format(workDate, 'yyyy-MM-dd'),
           change_type: 'absence',
           work_store_id: workStoreId || selectedStoreId,
-          minutes: calculatedMinutes,
+          minutes: originalScheduleMinutes,
           note: `대타: ${workers.find((w) => w.id === workerId)?.name}`,
           created_by: currentWorker?.id || null,
           status: 'approved',
@@ -153,7 +243,7 @@ export default function NewChangePage() {
 
   const needsTimeInput = ['absence', 'overtime', 'substitute'].includes(changeType);
   const needsMinutesInput = ['late', 'early_leave'].includes(changeType);
-  const needsAmountInput = ['meal_allowance', 'weekly_holiday_pay'].includes(changeType);
+  const needsHoursInput = ['meal_allowance', 'weekly_holiday_pay'].includes(changeType);
 
   return (
     <div className="space-y-4 max-w-2xl">
@@ -313,16 +403,21 @@ export default function NewChangePage() {
               </div>
             )}
 
-            {/* 금액 입력 */}
-            {needsAmountInput && (
+            {/* 시간 입력 (식대, 주휴수당) */}
+            {needsHoursInput && (
               <div className="space-y-2">
-                <Label>금액 (원)</Label>
+                <Label>시간 (0.5시간 단위)</Label>
                 <Input
                   type="number"
-                  placeholder="예: 10000"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
+                  step="0.5"
+                  min="0"
+                  placeholder="예: 1.5"
+                  value={hours}
+                  onChange={(e) => setHours(e.target.value)}
                 />
+                <p className="text-xs text-gray-500">
+                  예: 0.5 = 30분, 1 = 1시간, 1.5 = 1시간 30분
+                </p>
               </div>
             )}
 

@@ -24,6 +24,18 @@ export interface Store {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  // Relations
+  wage_history?: StoreWageHistory[];
+}
+
+// 매장 시급 변경 이력
+export interface StoreWageHistory {
+  id: string;
+  store_id: string;
+  hourly_wage: number;
+  effective_from: string;
+  effective_to: string | null;
+  created_at: string;
 }
 
 // 근무자
@@ -35,6 +47,7 @@ export interface Worker {
   phone: string | null;
   is_tax_applied: boolean;
   is_active: boolean;
+  resigned_at: string | null; // 퇴사일 (null이면 재직 중)
   role: UserRole;
   created_at: string;
   updated_at: string;
@@ -50,6 +63,8 @@ export interface Schedule {
   day_of_week: number; // 0: 일, 1: 월, ..., 6: 토
   start_time: string;
   end_time: string;
+  effective_from: string | null; // 적용 시작일 (null이면 처음부터)
+  effective_to: string | null; // 적용 종료일 (null이면 계속 유효)
   is_active: boolean;
   created_at: string;
   updated_at: string;
