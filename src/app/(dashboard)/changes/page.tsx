@@ -57,12 +57,25 @@ export default function ChangesPage() {
     const monthStart = format(startOfMonth(currentDate), 'yyyy-MM-dd');
     const monthEnd = format(endOfMonth(currentDate), 'yyyy-MM-dd');
 
-    // 해당 매장에서 발생한 변동사항 조회 (work_store_id 기준)
+    // 1. 해당 매장 근무자 ID 조회
+    const { data: storeWorkers } = await supabase
+      .from('workers')
+      .select('id')
+      .eq('store_id', selectedStoreId);
+
+    const workerIds = storeWorkers?.map((w) => w.id) || [];
+
+    // 2. 해당 근무자들의 변동사항 조회 또는 해당 매장에서 근무한 변동사항 조회
+    // workerIds가 비어있으면 work_store_id만으로 조회
+    const orFilter = workerIds.length > 0
+      ? `worker_id.in.(${workerIds.join(',')}),work_store_id.eq.${selectedStoreId}`
+      : `work_store_id.eq.${selectedStoreId}`;
+
     const [changesRes, settlementRes] = await Promise.all([
       supabase
         .from('schedule_changes')
         .select('*, worker:workers(*)')
-        .eq('work_store_id', selectedStoreId)
+        .or(orFilter)
         .gte('work_date', monthStart)
         .lte('work_date', monthEnd)
         .order('work_date', { ascending: false }),
@@ -76,7 +89,15 @@ export default function ChangesPage() {
         .limit(1),
     ]);
 
-    setChanges((changesRes.data as ChangeWithWorker[]) || []);
+    // 중복 제거 (같은 변동사항이 두 조건에 모두 해당할 수 있음)
+    const uniqueChanges = changesRes.data?.reduce((acc, change) => {
+      if (!acc.find((c: ChangeWithWorker) => c.id === change.id)) {
+        acc.push(change);
+      }
+      return acc;
+    }, [] as ChangeWithWorker[]) || [];
+
+    setChanges(uniqueChanges);
     setIsMonthConfirmed((settlementRes.data?.length || 0) > 0);
     setIsLoading(false);
   };
