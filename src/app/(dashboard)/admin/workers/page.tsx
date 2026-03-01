@@ -67,6 +67,50 @@ interface ScheduleInput {
   isActive: boolean;
 }
 
+/**
+ * 현재 날짜 기준으로 유효한 스케줄만 필터링
+ * 각 요일별로 가장 최신의 유효한 스케줄만 반환
+ */
+function getCurrentEffectiveSchedules(schedules: Schedule[]): Schedule[] {
+  const today = format(new Date(), 'yyyy-MM-dd');
+
+  // 요일별로 그룹화
+  const byDayOfWeek: Map<number, Schedule[]> = new Map();
+
+  for (const schedule of schedules) {
+    if (!schedule.is_active) continue;
+
+    // 현재 날짜가 유효 기간 내에 있는지 확인
+    const afterStart = !schedule.effective_from || schedule.effective_from <= today;
+    const beforeEnd = !schedule.effective_to || schedule.effective_to >= today;
+
+    if (afterStart && beforeEnd) {
+      const existing = byDayOfWeek.get(schedule.day_of_week) || [];
+      existing.push(schedule);
+      byDayOfWeek.set(schedule.day_of_week, existing);
+    }
+  }
+
+  // 각 요일별로 가장 최신(effective_from이 가장 큰) 스케줄 선택
+  const result: Schedule[] = [];
+
+  for (const [, daySchedules] of byDayOfWeek) {
+    // effective_from 기준 내림차순 정렬 (null은 가장 오래된 것으로 처리)
+    const sorted = daySchedules.sort((a, b) => {
+      if (!a.effective_from && !b.effective_from) return 0;
+      if (!a.effective_from) return 1;
+      if (!b.effective_from) return -1;
+      return b.effective_from.localeCompare(a.effective_from);
+    });
+
+    if (sorted.length > 0) {
+      result.push(sorted[0]);
+    }
+  }
+
+  return result;
+}
+
 export default function WorkersPage() {
   const { selectedStoreId } = useStoreSelection();
   const [workers, setWorkers] = useState<WorkerWithSchedules[]>([]);
@@ -946,8 +990,7 @@ export default function WorkersPage() {
                     <TableCell>{worker.phone || '-'}</TableCell>
                     <TableCell>
                       <div className="flex flex-wrap gap-1">
-                        {worker.schedules
-                          .filter((s) => s.is_active)
+                        {getCurrentEffectiveSchedules(worker.schedules)
                           .sort((a, b) => a.day_of_week - b.day_of_week)
                           .map((s) => (
                             <Badge key={s.id} variant="outline" className="text-xs">
@@ -955,7 +998,7 @@ export default function WorkersPage() {
                               {s.start_time.slice(0, 5)}-{s.end_time.slice(0, 5)}
                             </Badge>
                           ))}
-                        {worker.schedules.filter((s) => s.is_active).length === 0 && (
+                        {getCurrentEffectiveSchedules(worker.schedules).length === 0 && (
                           <span className="text-gray-400 text-sm">미설정</span>
                         )}
                       </div>
