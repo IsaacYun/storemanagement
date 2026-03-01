@@ -58,12 +58,24 @@ function NewChangeForm() {
   // URL 쿼리 파라미터에서 초기값 가져오기
   const initialWorkerId = searchParams.get('workerId');
   const initialDate = searchParams.get('date');
+  const initialYear = searchParams.get('year');
+  const initialMonth = searchParams.get('month');
+
+  // 초기 날짜 결정: date > year/month > undefined
+  const getInitialDate = (): Date | undefined => {
+    if (initialDate) {
+      return new Date(initialDate);
+    }
+    if (initialYear && initialMonth) {
+      // 해당 월의 1일로 설정
+      return new Date(parseInt(initialYear), parseInt(initialMonth) - 1, 1);
+    }
+    return undefined;
+  };
 
   // 폼 상태
   const [workerId, setWorkerId] = useState(initialWorkerId || '');
-  const [workDate, setWorkDate] = useState<Date | undefined>(
-    initialDate ? new Date(initialDate) : undefined
-  );
+  const [workDate, setWorkDate] = useState<Date | undefined>(getInitialDate());
   const [changeType, setChangeType] = useState<ChangeType>('absence');
   const [startTime, setStartTime] = useState('');
   const [endTime, setEndTime] = useState('');
@@ -319,6 +331,7 @@ function NewChangeForm() {
                     mode="single"
                     selected={workDate}
                     onSelect={setWorkDate}
+                    defaultMonth={workDate || (initialYear && initialMonth ? new Date(parseInt(initialYear), parseInt(initialMonth) - 1) : undefined)}
                     locale={ko}
                   />
                 </PopoverContent>

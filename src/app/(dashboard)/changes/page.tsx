@@ -184,7 +184,7 @@ export default function ChangesPage() {
           )}
         </div>
         <Button
-          onClick={() => router.push('/changes/new')}
+          onClick={() => router.push(`/changes/new?year=${year}&month=${month}`)}
           disabled={isMonthConfirmed}
         >
           <Plus className="h-4 w-4 mr-2" />
