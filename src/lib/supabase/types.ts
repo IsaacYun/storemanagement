@@ -7,7 +7,8 @@ export type ChangeType =
   | 'late'              // 지각
   | 'early_leave'       // 조퇴
   | 'meal_allowance'    // 식대
-  | 'weekly_holiday_pay'; // 주휴수당
+  | 'weekly_holiday_pay' // 주휴수당
+  | 'full_attendance_bonus'; // 만근수당
 
 export type UserRole = 'admin' | 'worker';
 export type SettlementStatus = 'draft' | 'confirmed' | 'paid';
@@ -155,6 +156,7 @@ export const CHANGE_TYPE_LABELS: Record<ChangeType, string> = {
   early_leave: '조퇴',
   meal_allowance: '식대',
   weekly_holiday_pay: '주휴수당',
+  full_attendance_bonus: '만근수당',
 };
 
 // 변동사항 타입 색상 (Badge 용)
@@ -166,4 +168,5 @@ export const CHANGE_TYPE_COLORS: Record<ChangeType, string> = {
   early_leave: 'outline',
   meal_allowance: 'default',
   weekly_holiday_pay: 'default',
+  full_attendance_bonus: 'default',
 };

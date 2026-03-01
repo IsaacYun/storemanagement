@@ -34,6 +34,7 @@ const CHANGE_TYPES: ChangeType[] = [
   'early_leave',
   'meal_allowance',
   'weekly_holiday_pay',
+  'full_attendance_bonus',
 ];
 
 export default function NewChangePage() {
@@ -243,7 +244,7 @@ export default function NewChangePage() {
 
   const needsTimeInput = ['absence', 'overtime', 'substitute'].includes(changeType);
   const needsMinutesInput = ['late', 'early_leave'].includes(changeType);
-  const needsHoursInput = ['meal_allowance', 'weekly_holiday_pay'].includes(changeType);
+  const needsHoursInput = ['meal_allowance', 'weekly_holiday_pay', 'full_attendance_bonus'].includes(changeType);
 
   return (
     <div className="space-y-4 max-w-2xl">

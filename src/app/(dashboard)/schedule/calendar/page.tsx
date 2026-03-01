@@ -50,7 +50,7 @@ import { logActivity } from '@/lib/utils/activityLog';
 
 interface WorkEntry {
   worker: Worker;
-  type: 'schedule' | 'substitute' | 'overtime' | 'meal_allowance' | 'weekly_holiday_pay';
+  type: 'schedule' | 'substitute' | 'overtime' | 'meal_allowance' | 'weekly_holiday_pay' | 'full_attendance_bonus';
   schedule: Schedule | null;
   change: ScheduleChange | null;
   startTime: string;
@@ -476,7 +476,25 @@ export default function CalendarPage() {
         });
       });
 
-      // 6. 스케줄 없는데 미근무만 있는 경우 (타매장 대타로 인한 미근무 등)
+      // 6. 만근수당 항목들 (별도 표시)
+      const fullAttendanceBonusChanges = workerChanges.filter((c) => c.change_type === 'full_attendance_bonus');
+      fullAttendanceBonusChanges.forEach((c) => {
+        entries.push({
+          worker,
+          type: 'full_attendance_bonus',
+          schedule: null,
+          change: c,
+          startTime: '',
+          endTime: '',
+          workMinutes: c.minutes || 0,
+          hasAbsence: false,
+          hasLate: false,
+          hasEarlyLeave: false,
+          relatedChanges: [],
+        });
+      });
+
+      // 7. 스케줄 없는데 미근무만 있는 경우 (타매장 대타로 인한 미근무 등)
       if (!schedule && hasAbsence && substituteChanges.length === 0 && overtimeChanges.length === 0) {
         entries.push({
           worker,
@@ -650,6 +668,8 @@ export default function CalendarPage() {
                                 ? 'bg-purple-100 text-purple-800'
                                 : entry.type === 'weekly_holiday_pay'
                                 ? 'bg-indigo-100 text-indigo-800'
+                                : entry.type === 'full_attendance_bonus'
+                                ? 'bg-amber-100 text-amber-800'
                                 : 'bg-gray-100'
                             )}
                           >
@@ -658,13 +678,14 @@ export default function CalendarPage() {
                               {entry.type === 'overtime' && <span className="mr-0.5">[추가]</span>}
                               {entry.type === 'meal_allowance' && <span className="mr-0.5">[식대]</span>}
                               {entry.type === 'weekly_holiday_pay' && <span className="mr-0.5">[주휴]</span>}
+                              {entry.type === 'full_attendance_bonus' && <span className="mr-0.5">[만근]</span>}
                               {entry.worker.name}
                               {entry.startTime && entry.endTime && !entry.hasAbsence && (
                                 <span className="text-gray-500 ml-1">
                                   {entry.startTime.slice(0, 5)}-{entry.endTime.slice(0, 5)}
                                 </span>
                               )}
-                              {(entry.type === 'meal_allowance' || entry.type === 'weekly_holiday_pay') && entry.workMinutes > 0 && (
+                              {(entry.type === 'meal_allowance' || entry.type === 'weekly_holiday_pay' || entry.type === 'full_attendance_bonus') && entry.workMinutes > 0 && (
                                 <span className="text-gray-500 ml-1">
                                   {(entry.workMinutes / 60).toFixed(1)}h
                                 </span>
@@ -712,6 +733,10 @@ export default function CalendarPage() {
         <div className="flex items-center gap-1">
           <div className="w-3 h-3 rounded bg-indigo-100" />
           <span>[주휴수당]</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <div className="w-3 h-3 rounded bg-amber-100" />
+          <span>[만근수당]</span>
         </div>
         <div className="flex items-center gap-1">
           <div className="w-3 h-3 rounded bg-red-100" />
