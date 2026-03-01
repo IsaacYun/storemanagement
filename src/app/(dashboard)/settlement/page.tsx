@@ -507,9 +507,6 @@ export default function SettlementPage() {
                     <TableCell className="text-right">
                       {formatMinutesToHoursAndMinutes(totals.workMinutes)}
                     </TableCell>
-                    <TableCell className="text-right" colSpan={2}>
-                      -
-                    </TableCell>
                     <TableCell className="text-right">
                       {formatMoney(totals.grossWage)}원
                     </TableCell>
@@ -550,8 +547,7 @@ export default function SettlementPage() {
 
       {/* 범례 */}
       <div className="text-sm text-gray-500">
-        <p>* 추가지급: 식대 + 주휴수당 + 만근보너스</p>
-        <p>* 추가근무+대타근무 합산 시간이 0.5시간 단위로 올림 처리됩니다 (↑ 표시)</p>
+        <p>* 총 근무시간이 0.5시간 단위로 올림 처리됩니다 (↑ 표시)</p>
         <p>* 행을 클릭하면 상세 정산 내역을 볼 수 있습니다</p>
       </div>
 
