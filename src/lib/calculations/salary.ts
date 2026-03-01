@@ -13,7 +13,8 @@ export interface SalaryCalculation {
   mealAllowanceWage: number; // 식대 금액 (시급 * 시간)
   weeklyHolidayPayHours: number; // 주휴수당 시간
   weeklyHolidayPayWage: number; // 주휴수당 금액
-  fullAttendanceBonus: number;
+  fullAttendanceBonusHours: number; // 만근수당 시간
+  fullAttendanceBonus: number; // 만근수당 금액
 
   // 정산
   grossWage: number;
@@ -65,9 +66,16 @@ export function calculateSalary(
   const weeklyHolidayPayHours = weeklyHolidayPayMinutes / 60;
   const weeklyHolidayPayWage = Math.round(weeklyHolidayPayHours * hourlyWage);
 
-  const fullAttendanceBonus = isFullAttendance
-    ? store.full_attendance_bonus
-    : 0;
+  // 만근수당: 변동사항에서 입력한 시간 기준으로 계산
+  // (기존 isFullAttendance 로직 대신 변동사항 입력 기반으로 변경)
+  const fullAttendanceBonusMinutes = approvedChanges
+    .filter((c) => c.change_type === 'full_attendance_bonus')
+    .reduce((sum, c) => sum + (c.minutes || 0), 0);
+  const fullAttendanceBonusHours = fullAttendanceBonusMinutes / 60;
+  // 변동사항에 만근수당이 입력되면 시간*시급으로 계산, 없으면 기존 방식
+  const fullAttendanceBonus = fullAttendanceBonusMinutes > 0
+    ? Math.round(fullAttendanceBonusHours * hourlyWage)
+    : (isFullAttendance ? store.full_attendance_bonus : 0);
 
   // 세전 급여
   const grossWage =
@@ -89,6 +97,7 @@ export function calculateSalary(
     mealAllowanceWage,
     weeklyHolidayPayHours,
     weeklyHolidayPayWage,
+    fullAttendanceBonusHours,
     fullAttendanceBonus,
     grossWage,
     taxRate,

@@ -654,7 +654,12 @@ export default function SettlementPage() {
                   )}
                   {selectedWorker.salary.fullAttendanceBonus > 0 && (
                     <div className="flex justify-between text-green-600">
-                      <span>만근보너스</span>
+                      <span>
+                        만근수당
+                        {selectedWorker.salary.fullAttendanceBonusHours > 0 && (
+                          <> ({selectedWorker.salary.fullAttendanceBonusHours}시간 × 시급)</>
+                        )}
+                      </span>
                       <span>+{formatMoney(selectedWorker.salary.fullAttendanceBonus)}원</span>
                     </div>
                   )}

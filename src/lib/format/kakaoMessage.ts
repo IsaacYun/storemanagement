@@ -60,7 +60,11 @@ export function generateKakaoMessage(options: KakaoMessageOptions): string {
     message += `  주휴수당: +${formatMoney(salary.weeklyHolidayPayWage)}원 (${salary.weeklyHolidayPayHours}시간)\n`;
   }
   if (salary.fullAttendanceBonus > 0) {
-    message += `  만근보너스: +${formatMoney(salary.fullAttendanceBonus)}원\n`;
+    message += `  만근수당: +${formatMoney(salary.fullAttendanceBonus)}원`;
+    if (salary.fullAttendanceBonusHours > 0) {
+      message += ` (${salary.fullAttendanceBonusHours}시간)`;
+    }
+    message += `\n`;
   }
 
   message += `  ─────────────\n`;
