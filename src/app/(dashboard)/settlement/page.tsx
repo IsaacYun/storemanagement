@@ -641,10 +641,6 @@ export default function SettlementPage() {
                     <span>시급</span>
                     <span>{formatMoney(store.hourly_wage)}원</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span>기본급 ({formatMinutesToHoursAndMinutes(selectedWorker.workHours.totalMinutesRounded)} × 시급)</span>
-                    <span>{formatMoney(selectedWorker.salary.baseWage)}원</span>
-                  </div>
                   <div className="border-t pt-1 mt-1 flex justify-between">
                     <span>세전급여</span>
                     <span>{formatMoney(selectedWorker.salary.grossWage)}원</span>

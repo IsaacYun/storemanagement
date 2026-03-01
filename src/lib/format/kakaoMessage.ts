@@ -60,7 +60,6 @@ export function generateKakaoMessage(options: KakaoMessageOptions): string {
   // 급여 내역
   message += `▶ 급여 내역\n`;
   message += `  시급: ${formatMoney(salary.hourlyWage)}원\n`;
-  message += `  기본급: ${formatMoney(salary.baseWage)}원\n`;
   message += `  ─────────────\n`;
   message += `  세전: ${formatMoney(salary.grossWage)}원\n`;
 
