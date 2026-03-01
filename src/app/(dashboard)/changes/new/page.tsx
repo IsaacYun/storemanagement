@@ -180,6 +180,45 @@ function NewChangeForm() {
         }
       }
 
+      const dateStr = format(workDate, 'yyyy-MM-dd');
+
+      // 지각/조퇴는 미근무가 있으면 등록 불가
+      if (['late', 'early_leave'].includes(changeType)) {
+        const { data: existingAbsence } = await supabase
+          .from('schedule_changes')
+          .select('id')
+          .eq('worker_id', workerId)
+          .eq('work_date', dateStr)
+          .eq('change_type', 'absence')
+          .eq('status', 'approved')
+          .maybeSingle();
+
+        if (existingAbsence) {
+          toast.error('해당 날짜에 미근무가 등록되어 있어 지각/조퇴를 추가할 수 없습니다');
+          setIsLoading(false);
+          return;
+        }
+      }
+
+      // 미근무 등록 시 기존 지각/조퇴 삭제
+      if (changeType === 'absence') {
+        const { data: existingLateEarly } = await supabase
+          .from('schedule_changes')
+          .select('id, change_type')
+          .eq('worker_id', workerId)
+          .eq('work_date', dateStr)
+          .in('change_type', ['late', 'early_leave']);
+
+        if (existingLateEarly && existingLateEarly.length > 0) {
+          await supabase
+            .from('schedule_changes')
+            .delete()
+            .in('id', existingLateEarly.map(c => c.id));
+
+          toast.info('해당 날짜의 지각/조퇴가 함께 삭제되었습니다');
+        }
+      }
+
       // 시간 계산
       let calculatedMinutes = parseInt(minutes) || 0;
       if (startTime && endTime) {
@@ -213,7 +252,6 @@ function NewChangeForm() {
       if (changeType === 'substitute' && originalWorkerId) {
         // 원래 근무자의 해당 날짜 스케줄 시간 조회
         const dayOfWeek = getDay(workDate);
-        const dateStr = format(workDate, 'yyyy-MM-dd');
 
         const { data: originalWorkerSchedules } = await supabase
           .from('schedules')
@@ -240,9 +278,24 @@ function NewChangeForm() {
           }
         }
 
+        // 원래 근무자의 지각/조퇴 삭제 (미근무로 대체되므로)
+        const { data: originalWorkerLateEarly } = await supabase
+          .from('schedule_changes')
+          .select('id')
+          .eq('worker_id', originalWorkerId)
+          .eq('work_date', dateStr)
+          .in('change_type', ['late', 'early_leave']);
+
+        if (originalWorkerLateEarly && originalWorkerLateEarly.length > 0) {
+          await supabase
+            .from('schedule_changes')
+            .delete()
+            .in('id', originalWorkerLateEarly.map(c => c.id));
+        }
+
         await supabase.from('schedule_changes').insert({
           worker_id: originalWorkerId,
-          work_date: format(workDate, 'yyyy-MM-dd'),
+          work_date: dateStr,
           change_type: 'absence',
           work_store_id: workStoreId || selectedStoreId,
           minutes: originalScheduleMinutes,
