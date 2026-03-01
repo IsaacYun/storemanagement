@@ -43,6 +43,15 @@ export function generateKakaoMessage(options: KakaoMessageOptions): string {
   if (workHours.earlyLeaveMinutes > 0) {
     message += `  조퇴: -${formatMinutesToHoursAndMinutes(workHours.earlyLeaveMinutes)}\n`;
   }
+  if (workHours.mealAllowanceMinutes > 0) {
+    message += `  식대: +${formatMinutesToHoursAndMinutes(workHours.mealAllowanceMinutes)}\n`;
+  }
+  if (workHours.weeklyHolidayPayMinutes > 0) {
+    message += `  주휴수당: +${formatMinutesToHoursAndMinutes(workHours.weeklyHolidayPayMinutes)}\n`;
+  }
+  if (workHours.fullAttendanceBonusMinutes > 0) {
+    message += `  만근수당: +${formatMinutesToHoursAndMinutes(workHours.fullAttendanceBonusMinutes)}\n`;
+  }
 
   message += `  총 근무: ${formatMinutesToHoursAndMinutes(workHours.totalMinutesRounded)}`;
   if (workHours.hasRounding) message += ` (0.5시간 단위 올림 적용)`;

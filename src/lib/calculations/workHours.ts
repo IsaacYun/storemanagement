@@ -10,6 +10,9 @@ export interface MonthlyWorkHours {
   substituteMinutesRounded: number; // 0.5시간 단위 올림
   lateMinutes: number;
   earlyLeaveMinutes: number;
+  mealAllowanceMinutes: number; // 식대 시간
+  weeklyHolidayPayMinutes: number; // 주휴수당 시간
+  fullAttendanceBonusMinutes: number; // 만근수당 시간
   totalMinutes: number;
   totalMinutesRounded: number; // 올림 적용된 총 근무시간
   hasRounding: boolean; // 올림이 적용되었는지 여부
@@ -167,12 +170,15 @@ export function calculateMonthlyWorkHours(
   const substituteMinutes = sumMinutesByType(monthChanges, 'substitute');
   const lateMinutes = sumMinutesByType(monthChanges, 'late');
   const earlyLeaveMinutes = sumMinutesByType(monthChanges, 'early_leave');
+  const mealAllowanceMinutes = sumMinutesByType(monthChanges, 'meal_allowance');
+  const weeklyHolidayPayMinutes = sumMinutesByType(monthChanges, 'weekly_holiday_pay');
+  const fullAttendanceBonusMinutes = sumMinutesByType(monthChanges, 'full_attendance_bonus');
 
   // 추가근무/대타는 개별 올림 없이 원본 값 그대로 (표시용)
   const overtimeMinutesRounded = overtimeMinutes;
   const substituteMinutesRounded = substituteMinutes;
 
-  // 총 근무시간 계산 (원래 값)
+  // 총 근무시간 계산 (원래 값) - 식대, 주휴수당, 만근수당 포함
   const totalMinutes = Math.max(
     0,
     baseMinutes -
@@ -180,21 +186,27 @@ export function calculateMonthlyWorkHours(
       overtimeMinutes +
       substituteMinutes -
       lateMinutes -
-      earlyLeaveMinutes
+      earlyLeaveMinutes +
+      mealAllowanceMinutes +
+      weeklyHolidayPayMinutes +
+      fullAttendanceBonusMinutes
   );
 
   // 추가근무+대타 합산에 대해서만 0.5시간 단위 올림 적용
   const extraMinutes = overtimeMinutes + substituteMinutes;
   const extraMinutesRounded = roundUpToHalfHour(extraMinutes);
 
-  // 총 근무시간 계산 (추가근무+대타 합산에만 올림 적용)
+  // 총 근무시간 계산 (추가근무+대타 합산에만 올림 적용) - 식대, 주휴수당, 만근수당 포함
   const totalMinutesRounded = Math.max(
     0,
     baseMinutes -
       absenceMinutes +
       extraMinutesRounded -
       lateMinutes -
-      earlyLeaveMinutes
+      earlyLeaveMinutes +
+      mealAllowanceMinutes +
+      weeklyHolidayPayMinutes +
+      fullAttendanceBonusMinutes
   );
 
   // 올림이 적용되었는지 확인
@@ -209,6 +221,9 @@ export function calculateMonthlyWorkHours(
     substituteMinutesRounded,
     lateMinutes,
     earlyLeaveMinutes,
+    mealAllowanceMinutes,
+    weeklyHolidayPayMinutes,
+    fullAttendanceBonusMinutes,
     totalMinutes,
     totalMinutesRounded,
     hasRounding,

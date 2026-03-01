@@ -616,6 +616,24 @@ export default function SettlementPage() {
                       <span>-{formatMinutesToHoursAndMinutes(selectedWorker.workHours.earlyLeaveMinutes)}</span>
                     </div>
                   )}
+                  {selectedWorker.workHours.mealAllowanceMinutes > 0 && (
+                    <div className="flex justify-between text-purple-600">
+                      <span>식대</span>
+                      <span>+{formatMinutesToHoursAndMinutes(selectedWorker.workHours.mealAllowanceMinutes)}</span>
+                    </div>
+                  )}
+                  {selectedWorker.workHours.weeklyHolidayPayMinutes > 0 && (
+                    <div className="flex justify-between text-purple-600">
+                      <span>주휴수당</span>
+                      <span>+{formatMinutesToHoursAndMinutes(selectedWorker.workHours.weeklyHolidayPayMinutes)}</span>
+                    </div>
+                  )}
+                  {selectedWorker.workHours.fullAttendanceBonusMinutes > 0 && (
+                    <div className="flex justify-between text-purple-600">
+                      <span>만근수당</span>
+                      <span>+{formatMinutesToHoursAndMinutes(selectedWorker.workHours.fullAttendanceBonusMinutes)}</span>
+                    </div>
+                  )}
                   <div className="border-t pt-1 mt-1 font-medium flex justify-between">
                     <span>총 근무시간</span>
                     <span>
