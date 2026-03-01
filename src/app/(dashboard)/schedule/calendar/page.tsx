@@ -7,8 +7,10 @@ import { useStoreSelection } from '@/lib/stores/useStoreSelection';
 import { useMonthSelection } from '@/lib/stores/useMonthSelection';
 import { Schedule, ScheduleChange, Worker } from '@/lib/supabase/types';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Textarea } from '@/components/ui/textarea';
+import { toast } from 'sonner';
 import {
   format,
   startOfMonth,
@@ -45,7 +47,6 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { toast } from 'sonner';
 import { logActivity } from '@/lib/utils/activityLog';
 
 interface WorkEntry {
@@ -79,6 +80,8 @@ export default function CalendarPage() {
   const [changes, setChanges] = useState<ScheduleChange[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isMonthConfirmed, setIsMonthConfirmed] = useState(false);
+  const [monthlyNote, setMonthlyNote] = useState('');
+  const [isSavingNote, setIsSavingNote] = useState(false);
   const [selectedDay, setSelectedDay] = useState<{
     date: Date;
     worker: Worker;
@@ -107,7 +110,7 @@ export default function CalendarPage() {
     const monthEnd = format(endOfMonth(currentDate), 'yyyy-MM-dd');
 
     // 해당 매장 근무자 + 관리자(모든 매장에서 보임)
-    const [storeWorkersRes, adminWorkersRes, schedulesRes, settlementRes] = await Promise.all([
+    const [storeWorkersRes, adminWorkersRes, schedulesRes, settlementRes, noteRes] = await Promise.all([
       supabase
         .from('workers')
         .select('*')
@@ -133,6 +136,13 @@ export default function CalendarPage() {
         .eq('month', month)
         .eq('status', 'confirmed')
         .limit(1),
+      supabase
+        .from('monthly_notes')
+        .select('note')
+        .eq('store_id', selectedStoreId)
+        .eq('year', year)
+        .eq('month', month)
+        .single(),
     ]);
 
     const changesRes = await supabase
@@ -151,7 +161,36 @@ export default function CalendarPage() {
     setSchedules(schedulesRes.data || []);
     setChanges(changesRes.data || []);
     setIsMonthConfirmed((settlementRes.data?.length || 0) > 0);
+    setMonthlyNote(noteRes.data?.note || '');
     setIsLoading(false);
+  };
+
+  const handleSaveNote = async () => {
+    if (!selectedStoreId) return;
+
+    setIsSavingNote(true);
+    const supabase = createClient();
+
+    try {
+      const { error } = await supabase
+        .from('monthly_notes')
+        .upsert({
+          store_id: selectedStoreId,
+          year,
+          month,
+          note: monthlyNote,
+        }, {
+          onConflict: 'store_id,year,month',
+        });
+
+      if (error) throw error;
+      toast.success('메모가 저장되었습니다');
+    } catch (error) {
+      toast.error('메모 저장에 실패했습니다');
+      console.error(error);
+    } finally {
+      setIsSavingNote(false);
+    }
   };
 
   useEffect(() => {
@@ -751,6 +790,26 @@ export default function CalendarPage() {
           <span>조퇴</span>
         </div>
       </div>
+
+      {/* 월별 메모 */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">월별 메모</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <Textarea
+            placeholder="이 달의 특이사항, 전체 변동사항 요약, 공지사항 등을 기록하세요..."
+            value={monthlyNote}
+            onChange={(e) => setMonthlyNote(e.target.value)}
+            rows={4}
+          />
+          <div className="flex justify-end">
+            <Button onClick={handleSaveNote} disabled={isSavingNote} size="sm">
+              {isSavingNote ? '저장 중...' : '메모 저장'}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* 근무자별 일별 상세 다이얼로그 */}
       <Dialog open={!!selectedDay} onOpenChange={() => setSelectedDay(null)}>
