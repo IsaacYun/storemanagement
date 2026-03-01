@@ -46,40 +46,38 @@ export function calculateSalary(
   const hourlyWage = store.hourly_wage;
 
   // 기본급 계산 (올림 적용된 시간 기준)
+  // totalMinutesRounded에 이미 식대, 주휴수당, 만근수당 시간이 포함되어 있음
   const workHoursDecimal = totalMinutesRounded / 60;
   const baseWage = Math.round(workHoursDecimal * hourlyWage);
 
-  // 추가 지급 항목 집계
+  // 추가 지급 항목 집계 (표시용으로만 사용, 급여 계산에는 미반영 - 이미 totalMinutesRounded에 포함)
   const approvedChanges = changes.filter((c) => c.status === 'approved');
 
-  // 식대: 시간(분) 기준으로 계산
+  // 식대: 시간(분) 기준으로 계산 (표시용)
   const mealAllowanceMinutes = approvedChanges
     .filter((c) => c.change_type === 'meal_allowance')
     .reduce((sum, c) => sum + (c.minutes || 0), 0);
   const mealAllowanceHours = mealAllowanceMinutes / 60;
   const mealAllowanceWage = Math.round(mealAllowanceHours * hourlyWage);
 
-  // 주휴수당: 시간(분) 기준으로 계산
+  // 주휴수당: 시간(분) 기준으로 계산 (표시용)
   const weeklyHolidayPayMinutes = approvedChanges
     .filter((c) => c.change_type === 'weekly_holiday_pay')
     .reduce((sum, c) => sum + (c.minutes || 0), 0);
   const weeklyHolidayPayHours = weeklyHolidayPayMinutes / 60;
   const weeklyHolidayPayWage = Math.round(weeklyHolidayPayHours * hourlyWage);
 
-  // 만근수당: 변동사항에서 입력한 시간 기준으로 계산
-  // (기존 isFullAttendance 로직 대신 변동사항 입력 기반으로 변경)
+  // 만근수당: 시간(분) 기준으로 계산 (표시용)
   const fullAttendanceBonusMinutes = approvedChanges
     .filter((c) => c.change_type === 'full_attendance_bonus')
     .reduce((sum, c) => sum + (c.minutes || 0), 0);
   const fullAttendanceBonusHours = fullAttendanceBonusMinutes / 60;
-  // 변동사항에 만근수당이 입력되면 시간*시급으로 계산, 없으면 기존 방식
   const fullAttendanceBonus = fullAttendanceBonusMinutes > 0
     ? Math.round(fullAttendanceBonusHours * hourlyWage)
     : (isFullAttendance ? store.full_attendance_bonus : 0);
 
-  // 세전 급여
-  const grossWage =
-    baseWage + mealAllowanceWage + weeklyHolidayPayWage + fullAttendanceBonus;
+  // 세전 급여 (baseWage에 이미 모든 항목이 시간 기준으로 포함됨)
+  const grossWage = baseWage;
 
   // 세금 계산 (3.3% 사업소득세)
   const taxRate = worker.is_tax_applied ? 0.033 : 0;

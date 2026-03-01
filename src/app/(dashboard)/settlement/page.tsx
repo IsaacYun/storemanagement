@@ -446,8 +446,6 @@ export default function SettlementPage() {
                   <TableRow>
                     <TableHead>근무자</TableHead>
                     <TableHead className="text-right">총 근무시간</TableHead>
-                    <TableHead className="text-right">기본급</TableHead>
-                    <TableHead className="text-right">추가지급</TableHead>
                     <TableHead className="text-right">세전급여</TableHead>
                     <TableHead className="text-right">세금(3.3%)</TableHead>
                     <TableHead className="text-right">실수령액</TableHead>
@@ -456,11 +454,6 @@ export default function SettlementPage() {
                 </TableHeader>
                 <TableBody>
                   {settlements.map((s) => {
-                    const extras =
-                      s.salary.mealAllowanceWage +
-                      s.salary.weeklyHolidayPayWage +
-                      s.salary.fullAttendanceBonus;
-
                     return (
                       <TableRow
                         key={s.worker.id}
@@ -480,12 +473,6 @@ export default function SettlementPage() {
                           {s.workHours.hasRounding && (
                             <span className="text-xs text-blue-500 ml-1" title="0.5시간 단위 올림 적용">↑</span>
                           )}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {formatMoney(s.salary.baseWage)}원
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {extras > 0 ? `+${formatMoney(extras)}원` : '-'}
                         </TableCell>
                         <TableCell className="text-right">
                           {formatMoney(s.salary.grossWage)}원
@@ -658,29 +645,6 @@ export default function SettlementPage() {
                     <span>기본급 ({formatMinutesToHoursAndMinutes(selectedWorker.workHours.totalMinutesRounded)} × 시급)</span>
                     <span>{formatMoney(selectedWorker.salary.baseWage)}원</span>
                   </div>
-                  {selectedWorker.salary.mealAllowanceWage > 0 && (
-                    <div className="flex justify-between text-green-600">
-                      <span>식대 ({selectedWorker.salary.mealAllowanceHours}시간 × 시급)</span>
-                      <span>+{formatMoney(selectedWorker.salary.mealAllowanceWage)}원</span>
-                    </div>
-                  )}
-                  {selectedWorker.salary.weeklyHolidayPayWage > 0 && (
-                    <div className="flex justify-between text-green-600">
-                      <span>주휴수당 ({selectedWorker.salary.weeklyHolidayPayHours}시간 × 시급)</span>
-                      <span>+{formatMoney(selectedWorker.salary.weeklyHolidayPayWage)}원</span>
-                    </div>
-                  )}
-                  {selectedWorker.salary.fullAttendanceBonus > 0 && (
-                    <div className="flex justify-between text-green-600">
-                      <span>
-                        만근수당
-                        {selectedWorker.salary.fullAttendanceBonusHours > 0 && (
-                          <> ({selectedWorker.salary.fullAttendanceBonusHours}시간 × 시급)</>
-                        )}
-                      </span>
-                      <span>+{formatMoney(selectedWorker.salary.fullAttendanceBonus)}원</span>
-                    </div>
-                  )}
                   <div className="border-t pt-1 mt-1 flex justify-between">
                     <span>세전급여</span>
                     <span>{formatMoney(selectedWorker.salary.grossWage)}원</span>

@@ -61,21 +61,6 @@ export function generateKakaoMessage(options: KakaoMessageOptions): string {
   message += `▶ 급여 내역\n`;
   message += `  시급: ${formatMoney(salary.hourlyWage)}원\n`;
   message += `  기본급: ${formatMoney(salary.baseWage)}원\n`;
-
-  if (salary.mealAllowanceWage > 0) {
-    message += `  식대: +${formatMoney(salary.mealAllowanceWage)}원 (${salary.mealAllowanceHours}시간)\n`;
-  }
-  if (salary.weeklyHolidayPayWage > 0) {
-    message += `  주휴수당: +${formatMoney(salary.weeklyHolidayPayWage)}원 (${salary.weeklyHolidayPayHours}시간)\n`;
-  }
-  if (salary.fullAttendanceBonus > 0) {
-    message += `  만근수당: +${formatMoney(salary.fullAttendanceBonus)}원`;
-    if (salary.fullAttendanceBonusHours > 0) {
-      message += ` (${salary.fullAttendanceBonusHours}시간)`;
-    }
-    message += `\n`;
-  }
-
   message += `  ─────────────\n`;
   message += `  세전: ${formatMoney(salary.grossWage)}원\n`;
 
