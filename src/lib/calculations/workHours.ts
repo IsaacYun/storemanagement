@@ -192,25 +192,11 @@ export function calculateMonthlyWorkHours(
       fullAttendanceBonusMinutes
   );
 
-  // 추가근무+대타 합산에 대해서만 0.5시간 단위 올림 적용
-  const extraMinutes = overtimeMinutes + substituteMinutes;
-  const extraMinutesRounded = roundUpToHalfHour(extraMinutes);
-
-  // 총 근무시간 계산 (추가근무+대타 합산에만 올림 적용) - 식대, 주휴수당, 만근수당 포함
-  const totalMinutesRounded = Math.max(
-    0,
-    baseMinutes -
-      absenceMinutes +
-      extraMinutesRounded -
-      lateMinutes -
-      earlyLeaveMinutes +
-      mealAllowanceMinutes +
-      weeklyHolidayPayMinutes +
-      fullAttendanceBonusMinutes
-  );
+  // 총 근무시간에 0.5시간 단위 올림 적용
+  const totalMinutesRounded = roundUpToHalfHour(totalMinutes);
 
   // 올림이 적용되었는지 확인
-  const hasRounding = extraMinutesRounded !== extraMinutes;
+  const hasRounding = totalMinutesRounded !== totalMinutes;
 
   return {
     baseMinutes,
