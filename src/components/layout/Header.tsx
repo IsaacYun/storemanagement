@@ -30,12 +30,13 @@ import { Sidebar } from './Sidebar';
 export function Header() {
   const router = useRouter();
   const { worker, isAdmin } = useAuth();
-  const { selectedStoreId, setSelectedStore } = useStoreSelection();
+  const { selectedStoreId, setSelectedStore, _hasHydrated } = useStoreSelection();
   const [stores, setStores] = useState<Store[]>([]);
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const selectedStore = stores.find((s) => s.id === selectedStoreId);
 
+  // 매장 목록 불러오기
   useEffect(() => {
     const fetchStores = async () => {
       const supabase = createClient();
@@ -47,15 +48,18 @@ export function Header() {
 
       if (data) {
         setStores(data);
-        // 첫 번째 매장 자동 선택 (localStorage에 저장된 값이 없을 때만)
-        if (!selectedStoreId && data.length > 0) {
-          setSelectedStore(data[0].id);
-        }
       }
     };
 
     fetchStores();
-  }, [selectedStoreId, setSelectedStore]);
+  }, []);
+
+  // 하이드레이션 완료 후 기본 매장 선택 (저장된 값이 없을 때만)
+  useEffect(() => {
+    if (_hasHydrated && !selectedStoreId && stores.length > 0) {
+      setSelectedStore(stores[0].id);
+    }
+  }, [_hasHydrated, selectedStoreId, stores, setSelectedStore]);
 
   const handleLogout = async () => {
     const supabase = createClient();
