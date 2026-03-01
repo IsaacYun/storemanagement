@@ -117,6 +117,21 @@ export function calculateBaseMinutesForMonth(
 }
 
 /**
+ * 변동사항의 분 계산 (minutes 필드 또는 start_time/end_time으로 계산)
+ */
+function getChangeMinutes(change: ScheduleChange): number {
+  // minutes 필드가 있으면 사용
+  if (change.minutes && change.minutes > 0) {
+    return change.minutes;
+  }
+  // start_time과 end_time이 있으면 계산
+  if (change.start_time && change.end_time) {
+    return calculateMinutesBetween(change.start_time, change.end_time);
+  }
+  return 0;
+}
+
+/**
  * 변동사항 유형별 분 합계
  */
 function sumMinutesByType(
@@ -125,7 +140,7 @@ function sumMinutesByType(
 ): number {
   return changes
     .filter((c) => c.change_type === type && c.status === 'approved')
-    .reduce((sum, c) => sum + (c.minutes || 0), 0);
+    .reduce((sum, c) => sum + getChangeMinutes(c), 0);
 }
 
 /**
