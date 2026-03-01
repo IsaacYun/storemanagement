@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useStoreSelection } from '@/lib/stores/useStoreSelection';
-import { ActivityLog, Worker } from '@/lib/supabase/types';
+import { ActivityLog, Worker, Store } from '@/lib/supabase/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -222,10 +222,21 @@ function formatLogDescription(log: LogWithWorker): string {
 export default function LogsPage() {
   const { selectedStoreId } = useStoreSelection();
   const [logs, setLogs] = useState<LogWithWorker[]>([]);
+  const [stores, setStores] = useState<Store[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
   const pageSize = 20;
+
+  // 매장 목록 조회
+  useEffect(() => {
+    const fetchStores = async () => {
+      const supabase = createClient();
+      const { data } = await supabase.from('stores').select('*');
+      setStores(data || []);
+    };
+    fetchStores();
+  }, []);
 
   useEffect(() => {
     const fetchLogs = async () => {
@@ -252,6 +263,19 @@ export default function LogsPage() {
 
     fetchLogs();
   }, [page]);
+
+  // store_id로 매장명 찾기
+  const getStoreName = (log: LogWithWorker): string => {
+    const data = log.after_data || log.before_data;
+    if (!data || typeof data !== 'object') return '-';
+
+    const d = data as Record<string, unknown>;
+    const storeId = d.store_id || d.work_store_id;
+    if (!storeId) return '-';
+
+    const store = stores.find(s => s.id === storeId);
+    return store?.name || '-';
+  };
 
   const totalPages = Math.ceil(totalCount / pageSize);
 
@@ -287,6 +311,7 @@ export default function LogsPage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>시간</TableHead>
+                      <TableHead>매장</TableHead>
                       <TableHead>사용자</TableHead>
                       <TableHead>행동</TableHead>
                       <TableHead>대상</TableHead>
@@ -298,6 +323,9 @@ export default function LogsPage() {
                       <TableRow key={log.id}>
                         <TableCell className="whitespace-nowrap">
                           {format(new Date(log.created_at), 'M/d HH:mm', { locale: ko })}
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap text-gray-600">
+                          {getStoreName(log)}
                         </TableCell>
                         <TableCell>{log.worker?.name || '-'}</TableCell>
                         <TableCell>
