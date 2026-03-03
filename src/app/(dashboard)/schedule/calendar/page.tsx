@@ -352,14 +352,6 @@ export default function CalendarPage() {
   const firstDayOfWeek = getDay(startOfMonth(currentDate));
   const paddingDays = useMemo(() => Array(firstDayOfWeek).fill(null), [firstDayOfWeek]);
 
-  // 캘린더 데이터 메모이제이션 - 매 렌더링마다 31일 x workers 수만큼 계산하는 것 방지
-  const calendarData = useMemo(() => {
-    return calendarDays.map((date) => ({
-      date,
-      dayData: getDayData(date),
-    }));
-  }, [calendarDays, workers, schedules, changes]);
-
   // 특정 날짜에 유효한 스케줄 찾기
   const findEffectiveSchedule = (
     workerSchedules: Schedule[],
@@ -572,6 +564,14 @@ export default function CalendarPage() {
       totalWorkMinutes,
     };
   };
+
+  // 캘린더 데이터 메모이제이션 - 매 렌더링마다 31일 x workers 수만큼 계산하는 것 방지
+  const calendarData = useMemo(() => {
+    return calendarDays.map((date) => ({
+      date,
+      dayData: getDayData(date),
+    }));
+  }, [calendarDays, workers, schedules, changes]);
 
   const formatWorkTime = (minutes: number) => {
     const hours = Math.floor(minutes / 60);
