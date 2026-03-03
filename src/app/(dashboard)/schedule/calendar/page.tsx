@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useStoreSelection } from '@/lib/stores/useStoreSelection';
@@ -109,8 +109,8 @@ export default function CalendarPage() {
     const monthStart = format(startOfMonth(currentDate), 'yyyy-MM-dd');
     const monthEnd = format(endOfMonth(currentDate), 'yyyy-MM-dd');
 
-    // 해당 매장 근무자 + 관리자(모든 매장에서 보임)
-    const [storeWorkersRes, adminWorkersRes, schedulesRes, settlementRes, noteRes] = await Promise.all([
+    // 해당 매장 근무자 + 관리자(모든 매장에서 보임) + 변동사항 병렬 처리
+    const [storeWorkersRes, adminWorkersRes, schedulesRes, settlementRes, noteRes, changesRes] = await Promise.all([
       supabase
         .from('workers')
         .select('*')
@@ -143,14 +143,13 @@ export default function CalendarPage() {
         .eq('year', year)
         .eq('month', month)
         .single(),
+      supabase
+        .from('schedule_changes')
+        .select('*')
+        .eq('work_store_id', selectedStoreId)
+        .gte('work_date', monthStart)
+        .lte('work_date', monthEnd),
     ]);
-
-    const changesRes = await supabase
-      .from('schedule_changes')
-      .select('*')
-      .eq('work_store_id', selectedStoreId)
-      .gte('work_date', monthStart)
-      .lte('work_date', monthEnd);
 
     // 매장 근무자 + 관리자 합치기
     const allWorkers = [
@@ -345,13 +344,21 @@ export default function CalendarPage() {
     }
   };
 
-  const calendarDays = eachDayOfInterval({
+  const calendarDays = useMemo(() => eachDayOfInterval({
     start: startOfMonth(currentDate),
     end: endOfMonth(currentDate),
-  });
+  }), [currentDate]);
 
   const firstDayOfWeek = getDay(startOfMonth(currentDate));
-  const paddingDays = Array(firstDayOfWeek).fill(null);
+  const paddingDays = useMemo(() => Array(firstDayOfWeek).fill(null), [firstDayOfWeek]);
+
+  // 캘린더 데이터 메모이제이션 - 매 렌더링마다 31일 x workers 수만큼 계산하는 것 방지
+  const calendarData = useMemo(() => {
+    return calendarDays.map((date) => ({
+      date,
+      dayData: getDayData(date),
+    }));
+  }, [calendarDays, workers, schedules, changes]);
 
   // 특정 날짜에 유효한 스케줄 찾기
   const findEffectiveSchedule = (
@@ -647,8 +654,7 @@ export default function CalendarPage() {
                 <div key={`pad-${i}`} className="min-h-[120px] border-b border-r bg-gray-50" />
               ))}
 
-              {calendarDays.map((date) => {
-                const dayData = getDayData(date);
+              {calendarData.map(({ date, dayData }) => {
                 const dayOfWeek = getDay(date);
 
                 return (

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useStoreSelection } from '@/lib/stores/useStoreSelection';
 import { useMonthSelection } from '@/lib/stores/useMonthSelection';
@@ -314,8 +314,8 @@ export default function SettlementPage() {
     }
   };
 
-  // 합계 계산 (올림 적용된 시간 기준)
-  const totals = settlements.reduce(
+  // 합계 계산 (올림 적용된 시간 기준) - 메모이제이션
+  const totals = useMemo(() => settlements.reduce(
     (acc, s) => ({
       workMinutes: acc.workMinutes + s.workHours.totalMinutesRounded,
       grossWage: acc.grossWage + s.salary.grossWage,
@@ -323,7 +323,7 @@ export default function SettlementPage() {
       netWage: acc.netWage + s.salary.netWage,
     }),
     { workMinutes: 0, grossWage: 0, taxAmount: 0, netWage: 0 }
-  );
+  ), [settlements]);
 
   if (!selectedStoreId) {
     return (

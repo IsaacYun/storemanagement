@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useStoreSelection } from '@/lib/stores/useStoreSelection';
 import { Worker, Store, Schedule, DAY_LABELS } from '@/lib/supabase/types';
@@ -559,6 +559,14 @@ export default function WorkersPage() {
     toast.success(`${DAY_LABELS[fromDay]} 시간을 주말(토~일)에 복사했습니다`);
   };
 
+  // 각 근무자의 유효 스케줄을 미리 계산하여 메모이제이션
+  const workersWithEffectiveSchedules = useMemo(() => {
+    return workers.map((worker) => ({
+      ...worker,
+      effectiveSchedules: getCurrentEffectiveSchedules(worker.schedules),
+    }));
+  }, [workers]);
+
   if (!selectedStoreId) {
     return (
       <Card>
@@ -974,7 +982,7 @@ export default function WorkersPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {workers.map((worker) => (
+                {workersWithEffectiveSchedules.map((worker) => (
                   <TableRow
                     key={worker.id}
                     className={!worker.is_active ? 'opacity-50 bg-gray-50' : ''}
@@ -990,7 +998,7 @@ export default function WorkersPage() {
                     <TableCell>{worker.phone || '-'}</TableCell>
                     <TableCell>
                       <div className="flex flex-wrap gap-1">
-                        {getCurrentEffectiveSchedules(worker.schedules)
+                        {worker.effectiveSchedules
                           .sort((a, b) => a.day_of_week - b.day_of_week)
                           .map((s) => (
                             <Badge key={s.id} variant="outline" className="text-xs">
@@ -998,7 +1006,7 @@ export default function WorkersPage() {
                               {s.start_time.slice(0, 5)}-{s.end_time.slice(0, 5)}
                             </Badge>
                           ))}
-                        {getCurrentEffectiveSchedules(worker.schedules).length === 0 && (
+                        {worker.effectiveSchedules.length === 0 && (
                           <span className="text-gray-400 text-sm">미설정</span>
                         )}
                       </div>
