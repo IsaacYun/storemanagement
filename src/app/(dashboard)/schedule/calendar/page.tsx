@@ -60,6 +60,8 @@ interface WorkEntry {
   hasAbsence: boolean;
   hasLate: boolean;
   hasEarlyLeave: boolean;
+  hasScheduleChange: boolean; // 시간변경 여부
+  scheduleChangeData: ScheduleChange | null; // 시간변경 데이터
   relatedChanges: ScheduleChange[]; // 지각, 조퇴 등
 }
 
@@ -97,6 +99,12 @@ export default function CalendarPage() {
   const [editMinutes, setEditMinutes] = useState('');
   const [editHours, setEditHours] = useState(''); // 식대, 주휴수당용
   const [editNote, setEditNote] = useState('');
+
+  // 스케줄 수정 다이얼로그 상태 (결근/시간변경)
+  const [scheduleModifyMode, setScheduleModifyMode] = useState<'absence' | 'schedule_change' | null>(null);
+  const [scheduleModifyStartTime, setScheduleModifyStartTime] = useState('');
+  const [scheduleModifyEndTime, setScheduleModifyEndTime] = useState('');
+  const [scheduleModifyNote, setScheduleModifyNote] = useState('');
 
   const currentDate = new Date(year, month - 1);
 
@@ -344,6 +352,127 @@ export default function CalendarPage() {
     }
   };
 
+  // 스케줄 수정 (결근/시간변경) 저장
+  const handleScheduleModifySubmit = async () => {
+    if (!selectedDay || !scheduleModifyMode) return;
+
+    const supabase = createClient();
+    const dateStr = format(selectedDay.date, 'yyyy-MM-dd');
+
+    try {
+      // 이미 같은 타입의 변동사항이 있는지 확인
+      const existingChange = selectedDay.changes.find(
+        (c) => c.change_type === scheduleModifyMode
+      );
+
+      if (existingChange) {
+        // 기존 변동사항 업데이트
+        const updateData: Record<string, unknown> = {
+          note: scheduleModifyNote || null,
+        };
+
+        if (scheduleModifyMode === 'schedule_change') {
+          if (!scheduleModifyStartTime || !scheduleModifyEndTime) {
+            toast.error('변경할 시간을 입력해주세요');
+            return;
+          }
+          updateData.start_time = scheduleModifyStartTime;
+          updateData.end_time = scheduleModifyEndTime;
+          updateData.minutes = calculateMinutesBetween(scheduleModifyStartTime, scheduleModifyEndTime);
+        }
+
+        const { error } = await supabase
+          .from('schedule_changes')
+          .update(updateData)
+          .eq('id', existingChange.id);
+
+        if (error) throw error;
+        toast.success('변동사항이 수정되었습니다');
+
+        logActivity({
+          action: 'update',
+          targetTable: 'schedule_changes',
+          targetId: existingChange.id,
+          beforeData: { ...existingChange, worker_name: selectedDay.worker.name },
+          afterData: { ...existingChange, ...updateData, worker_name: selectedDay.worker.name },
+        });
+      } else {
+        // 새 변동사항 생성
+        const insertData: Record<string, unknown> = {
+          worker_id: selectedDay.worker.id,
+          work_date: dateStr,
+          change_type: scheduleModifyMode,
+          work_store_id: selectedStoreId,
+          note: scheduleModifyNote || null,
+          amount: 0,
+          status: 'approved',
+        };
+
+        if (scheduleModifyMode === 'schedule_change') {
+          if (!scheduleModifyStartTime || !scheduleModifyEndTime) {
+            toast.error('변경할 시간을 입력해주세요');
+            return;
+          }
+          insertData.start_time = scheduleModifyStartTime;
+          insertData.end_time = scheduleModifyEndTime;
+          insertData.minutes = calculateMinutesBetween(scheduleModifyStartTime, scheduleModifyEndTime);
+        } else {
+          // 결근인 경우 - 기본 스케줄 시간 저장
+          if (selectedDay.schedule) {
+            insertData.start_time = selectedDay.schedule.start_time;
+            insertData.end_time = selectedDay.schedule.end_time;
+            insertData.minutes = calculateMinutesBetween(
+              selectedDay.schedule.start_time,
+              selectedDay.schedule.end_time
+            );
+          }
+        }
+
+        const { error } = await supabase
+          .from('schedule_changes')
+          .insert(insertData);
+
+        if (error) throw error;
+
+        const typeLabel = scheduleModifyMode === 'absence' ? '결근' : '시간변경';
+        toast.success(`${typeLabel} 처리되었습니다`);
+
+        logActivity({
+          action: 'create',
+          targetTable: 'schedule_changes',
+          afterData: { ...insertData, worker_name: selectedDay.worker.name },
+        });
+      }
+
+      setScheduleModifyMode(null);
+      setScheduleModifyStartTime('');
+      setScheduleModifyEndTime('');
+      setScheduleModifyNote('');
+      fetchData();
+      setSelectedDay(null);
+    } catch (error) {
+      toast.error('저장에 실패했습니다');
+      console.error(error);
+    }
+  };
+
+  // 스케줄 수정 다이얼로그 열기
+  const openScheduleModifyDialog = (mode: 'absence' | 'schedule_change') => {
+    if (!selectedDay) return;
+
+    setScheduleModifyMode(mode);
+    setScheduleModifyNote('');
+
+    if (mode === 'schedule_change' && selectedDay.schedule) {
+      // 시간변경 모드: 기존 스케줄 시간으로 초기화
+      setScheduleModifyStartTime(selectedDay.schedule.start_time.slice(0, 5));
+      setScheduleModifyEndTime(selectedDay.schedule.end_time.slice(0, 5));
+    } else {
+      setScheduleModifyStartTime('');
+      setScheduleModifyEndTime('');
+    }
+  };
+
   const calendarDays = useMemo(() => eachDayOfInterval({
     start: startOfMonth(currentDate),
     end: endOfMonth(currentDate),
@@ -401,13 +530,23 @@ export default function CalendarPage() {
       const hasAbsence = workerChanges.some((c) => c.change_type === 'absence');
       const hasLate = workerChanges.some((c) => c.change_type === 'late');
       const hasEarlyLeave = workerChanges.some((c) => c.change_type === 'early_leave');
+      const scheduleChangeData = workerChanges.find((c) => c.change_type === 'schedule_change') || null;
+      const hasScheduleChange = !!scheduleChangeData;
       const relatedChanges = workerChanges.filter(
-        (c) => c.change_type === 'late' || c.change_type === 'early_leave' || c.change_type === 'absence'
+        (c) => c.change_type === 'late' || c.change_type === 'early_leave' || c.change_type === 'absence' || c.change_type === 'schedule_change'
       );
 
       // 1. 기본 스케줄 항목 (있으면)
       if (schedule) {
-        let workMinutes = calculateMinutesBetween(schedule.start_time, schedule.end_time);
+        // 시간변경이 있으면 변경된 시간 사용
+        const effectiveStartTime = hasScheduleChange && scheduleChangeData?.start_time
+          ? scheduleChangeData.start_time
+          : schedule.start_time;
+        const effectiveEndTime = hasScheduleChange && scheduleChangeData?.end_time
+          ? scheduleChangeData.end_time
+          : schedule.end_time;
+
+        let workMinutes = calculateMinutesBetween(effectiveStartTime, effectiveEndTime);
         if (hasAbsence) {
           workMinutes = 0;
         } else {
@@ -426,12 +565,14 @@ export default function CalendarPage() {
           type: 'schedule',
           schedule,
           change: null,
-          startTime: schedule.start_time,
-          endTime: schedule.end_time,
+          startTime: effectiveStartTime,
+          endTime: effectiveEndTime,
           workMinutes,
           hasAbsence,
           hasLate,
           hasEarlyLeave,
+          hasScheduleChange,
+          scheduleChangeData,
           relatedChanges,
         });
       }
@@ -453,6 +594,8 @@ export default function CalendarPage() {
           hasAbsence: false,
           hasLate: false,
           hasEarlyLeave: false,
+          hasScheduleChange: false,
+          scheduleChangeData: null,
           relatedChanges: [],
         });
       });
@@ -474,6 +617,8 @@ export default function CalendarPage() {
           hasAbsence: false,
           hasLate: false,
           hasEarlyLeave: false,
+          hasScheduleChange: false,
+          scheduleChangeData: null,
           relatedChanges: [],
         });
       });
@@ -492,6 +637,8 @@ export default function CalendarPage() {
           hasAbsence: false,
           hasLate: false,
           hasEarlyLeave: false,
+          hasScheduleChange: false,
+          scheduleChangeData: null,
           relatedChanges: [],
         });
       });
@@ -510,6 +657,8 @@ export default function CalendarPage() {
           hasAbsence: false,
           hasLate: false,
           hasEarlyLeave: false,
+          hasScheduleChange: false,
+          scheduleChangeData: null,
           relatedChanges: [],
         });
       });
@@ -528,6 +677,8 @@ export default function CalendarPage() {
           hasAbsence: false,
           hasLate: false,
           hasEarlyLeave: false,
+          hasScheduleChange: false,
+          scheduleChangeData: null,
           relatedChanges: [],
         });
       });
@@ -545,6 +696,8 @@ export default function CalendarPage() {
           hasAbsence: true,
           hasLate: false,
           hasEarlyLeave: false,
+          hasScheduleChange: false,
+          scheduleChangeData: null,
           relatedChanges,
         });
       }
@@ -573,11 +726,16 @@ export default function CalendarPage() {
     }));
   }, [calendarDays, workers, schedules, changes]);
 
+  // 월 총 근무시간 계산
+  const monthlyTotalMinutes = useMemo(() => {
+    return calendarData.reduce((sum, { dayData }) => sum + dayData.totalWorkMinutes, 0);
+  }, [calendarData]);
+
   const formatWorkTime = (minutes: number) => {
     const hours = Math.floor(minutes / 60);
     const mins = minutes % 60;
     if (mins === 0) return `${hours}h`;
-    return `${hours}h${mins}m`;
+    return `${hours}h ${mins}m`;
   };
 
   if (!selectedStoreId) {
@@ -611,6 +769,11 @@ export default function CalendarPage() {
             <Badge variant="secondary" className="ml-2">
               <Lock className="h-3 w-3 mr-1" />
               정산완료
+            </Badge>
+          )}
+          {monthlyTotalMinutes > 0 && (
+            <Badge variant="outline" className="ml-2 text-sm">
+              총 {formatWorkTime(monthlyTotalMinutes)}
             </Badge>
           )}
         </div>
@@ -705,6 +868,8 @@ export default function CalendarPage() {
                               'text-xs px-1 py-0.5 rounded truncate flex items-center justify-between cursor-pointer hover:ring-2 hover:ring-blue-300',
                               entry.hasAbsence
                                 ? 'bg-red-100 text-red-800 line-through'
+                                : entry.hasScheduleChange
+                                ? 'bg-cyan-100 text-cyan-800'
                                 : entry.type === 'substitute'
                                 ? 'bg-blue-100 text-blue-800'
                                 : entry.type === 'overtime'
@@ -737,6 +902,7 @@ export default function CalendarPage() {
                               )}
                             </span>
                             <span className="flex gap-0.5 ml-1 shrink-0">
+                              {entry.hasScheduleChange && <span className="w-2 h-2 rounded-full bg-cyan-500" title="시간변경" />}
                               {entry.hasLate && <span className="w-2 h-2 rounded-full bg-yellow-400" title="지각" />}
                               {entry.hasEarlyLeave && <span className="w-2 h-2 rounded-full bg-orange-400" title="조퇴" />}
                             </span>
@@ -785,7 +951,11 @@ export default function CalendarPage() {
         </div>
         <div className="flex items-center gap-1">
           <div className="w-3 h-3 rounded bg-red-100" />
-          <span>미근무</span>
+          <span>결근</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <div className="w-3 h-3 rounded bg-cyan-100" />
+          <span>시간변경</span>
         </div>
         <div className="flex items-center gap-1">
           <div className="w-2 h-2 rounded-full bg-yellow-400" />
@@ -830,11 +1000,63 @@ export default function CalendarPage() {
               {/* 기본 스케줄 정보 */}
               {selectedDay.schedule && (
                 <div className="space-y-2">
-                  <h4 className="font-medium text-sm">기본 스케줄</h4>
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-medium text-sm">기본 스케줄</h4>
+                    {!isMonthConfirmed && (
+                      <div className="flex gap-1">
+                        {!selectedDay.changes.some((c) => c.change_type === 'absence') && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                            onClick={() => openScheduleModifyDialog('absence')}
+                          >
+                            결근 처리
+                          </Button>
+                        )}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => openScheduleModifyDialog('schedule_change')}
+                        >
+                          시간 변경
+                        </Button>
+                      </div>
+                    )}
+                  </div>
                   <div className="bg-gray-50 rounded-lg p-3 text-sm">
-                    <p>
-                      근무시간: {selectedDay.schedule.start_time.slice(0, 5)} - {selectedDay.schedule.end_time.slice(0, 5)}
-                    </p>
+                    {(() => {
+                      const scheduleChange = selectedDay.changes.find((c) => c.change_type === 'schedule_change');
+                      const hasAbsence = selectedDay.changes.some((c) => c.change_type === 'absence');
+
+                      if (hasAbsence) {
+                        return (
+                          <p className="text-red-600 line-through">
+                            근무시간: {selectedDay.schedule.start_time.slice(0, 5)} - {selectedDay.schedule.end_time.slice(0, 5)}
+                            <span className="ml-2 text-red-700 font-medium no-underline">(결근)</span>
+                          </p>
+                        );
+                      }
+
+                      if (scheduleChange) {
+                        return (
+                          <div>
+                            <p className="text-gray-400 line-through text-xs">
+                              원래: {selectedDay.schedule.start_time.slice(0, 5)} - {selectedDay.schedule.end_time.slice(0, 5)}
+                            </p>
+                            <p className="text-blue-600 font-medium">
+                              변경: {scheduleChange.start_time?.slice(0, 5)} - {scheduleChange.end_time?.slice(0, 5)}
+                            </p>
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <p>
+                          근무시간: {selectedDay.schedule.start_time.slice(0, 5)} - {selectedDay.schedule.end_time.slice(0, 5)}
+                        </p>
+                      );
+                    })()}
                   </div>
                 </div>
               )}
@@ -975,8 +1197,8 @@ export default function CalendarPage() {
                 </Popover>
               </div>
 
-              {/* 시간 입력 (미근무, 추가근무, 대타) */}
-              {['absence', 'overtime', 'substitute'].includes(editingChange.change_type) && (
+              {/* 시간 입력 (미근무, 추가근무, 대타, 시간변경) */}
+              {['absence', 'overtime', 'substitute', 'schedule_change'].includes(editingChange.change_type) && (
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>시작 시간</Label>
@@ -1050,6 +1272,87 @@ export default function CalendarPage() {
                 </Button>
                 <Button onClick={handleEditSubmit} className="flex-1">
                   저장
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* 스케줄 수정 다이얼로그 (결근/시간변경) */}
+      <Dialog open={!!scheduleModifyMode} onOpenChange={() => setScheduleModifyMode(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>
+              {scheduleModifyMode === 'absence' ? '결근 처리' : '시간 변경'}
+            </DialogTitle>
+          </DialogHeader>
+          {scheduleModifyMode && selectedDay && (
+            <div className="space-y-4">
+              <div className="bg-gray-50 rounded-lg p-3 text-sm">
+                <p className="font-medium">{selectedDay.worker.name}</p>
+                <p className="text-gray-500">
+                  {format(selectedDay.date, 'M월 d일 (EEE)', { locale: ko })}
+                </p>
+                {selectedDay.schedule && (
+                  <p className="text-gray-500">
+                    원래 스케줄: {selectedDay.schedule.start_time.slice(0, 5)} - {selectedDay.schedule.end_time.slice(0, 5)}
+                  </p>
+                )}
+              </div>
+
+              {scheduleModifyMode === 'absence' && (
+                <p className="text-sm text-red-600">
+                  이 날의 근무가 결근 처리됩니다. 근무시간이 0으로 계산됩니다.
+                </p>
+              )}
+
+              {scheduleModifyMode === 'schedule_change' && (
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>변경 시작</Label>
+                    <Input
+                      type="time"
+                      value={scheduleModifyStartTime}
+                      onChange={(e) => setScheduleModifyStartTime(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>변경 종료</Label>
+                    <Input
+                      type="time"
+                      value={scheduleModifyEndTime}
+                      onChange={(e) => setScheduleModifyEndTime(e.target.value)}
+                    />
+                  </div>
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <Label>메모 (선택)</Label>
+                <Input
+                  placeholder="사유 등"
+                  value={scheduleModifyNote}
+                  onChange={(e) => setScheduleModifyNote(e.target.value)}
+                />
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setScheduleModifyMode(null)}
+                  className="flex-1"
+                >
+                  취소
+                </Button>
+                <Button
+                  onClick={handleScheduleModifySubmit}
+                  className={cn(
+                    'flex-1',
+                    scheduleModifyMode === 'absence' && 'bg-red-500 hover:bg-red-600'
+                  )}
+                >
+                  {scheduleModifyMode === 'absence' ? '결근 처리' : '시간 변경'}
                 </Button>
               </div>
             </div>

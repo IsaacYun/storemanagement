@@ -22,7 +22,6 @@ const menuItems = [
     title: '스케줄',
     items: [
       { href: '/schedule/calendar', label: '달력', icon: Calendar },
-      { href: '/changes', label: '변동사항', icon: ClipboardList },
     ],
   },
   {

@@ -1,7 +1,8 @@
 // 데이터베이스 테이블 타입 정의
 
 export type ChangeType =
-  | 'absence'           // 미근무
+  | 'absence'           // 결근 (해당 날짜 근무 전체 취소)
+  | 'schedule_change'   // 근무시간 변경 (원래 스케줄과 다른 시간으로 근무)
   | 'overtime'          // 추가근무
   | 'substitute'        // 대타
   | 'late'              // 지각
@@ -149,7 +150,8 @@ export const DAY_LABELS = ['일', '월', '화', '수', '목', '금', '토'] as c
 
 // 변동사항 타입 라벨
 export const CHANGE_TYPE_LABELS: Record<ChangeType, string> = {
-  absence: '미근무',
+  absence: '결근',
+  schedule_change: '시간변경',
   overtime: '추가근무',
   substitute: '대타',
   late: '지각',
@@ -162,6 +164,7 @@ export const CHANGE_TYPE_LABELS: Record<ChangeType, string> = {
 // 변동사항 타입 색상 (Badge 용)
 export const CHANGE_TYPE_COLORS: Record<ChangeType, string> = {
   absence: 'destructive',
+  schedule_change: 'secondary',
   overtime: 'default',
   substitute: 'secondary',
   late: 'outline',
