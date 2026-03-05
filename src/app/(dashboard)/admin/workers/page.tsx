@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useStoreSelection } from '@/lib/stores/useStoreSelection';
-import { Worker, Store, Schedule, DAY_LABELS } from '@/lib/supabase/types';
+import { Worker, Store, Schedule, DAY_LABELS, TaxType, TAX_TYPE_LABELS } from '@/lib/supabase/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -124,7 +124,7 @@ export default function WorkersPage() {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [storeId, setStoreId] = useState('');
-  const [isTaxApplied, setIsTaxApplied] = useState(true);
+  const [taxType, setTaxType] = useState<TaxType>('income_3.3');
   const [role, setRole] = useState<'admin' | 'worker'>('worker');
   const [resignedAt, setResignedAt] = useState<Date | undefined>(undefined);
   const [showResigned, setShowResigned] = useState(false);
@@ -201,7 +201,7 @@ export default function WorkersPage() {
     setName('');
     setPhone('');
     setStoreId(selectedStoreId || '');
-    setIsTaxApplied(true); // 기본값: 3.3% 세금 적용
+    setTaxType('income_3.3'); // 기본값: 3.3% 소득세
     setRole('worker');
     setResignedAt(undefined);
     setEditWorker(null);
@@ -217,7 +217,7 @@ export default function WorkersPage() {
     setName(worker.name);
     setPhone(worker.phone || '');
     setStoreId(worker.store_id);
-    setIsTaxApplied(worker.is_tax_applied);
+    setTaxType(worker.tax_type);
     setRole(worker.role);
     setResignedAt(worker.resigned_at ? new Date(worker.resigned_at) : undefined);
     setIsDialogOpen(true);
@@ -258,7 +258,7 @@ export default function WorkersPage() {
           name,
           phone: phone || null,
           store_id: storeId,
-          is_tax_applied: isTaxApplied,
+          tax_type: taxType,
           role,
           resigned_at: resignedAt ? format(resignedAt, 'yyyy-MM-dd') : null,
           is_active: !resignedAt, // 퇴사일이 설정되면 비활성화
@@ -276,7 +276,7 @@ export default function WorkersPage() {
           name,
           phone: phone || null,
           store_id: storeId,
-          is_tax_applied: isTaxApplied,
+          tax_type: taxType,
           role,
         };
         const { error } = await supabase.from('workers').insert(insertData);
@@ -653,12 +653,21 @@ export default function WorkersPage() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="flex items-center justify-between">
-                <Label>3.3% 세금 적용</Label>
-                <Switch
-                  checked={isTaxApplied}
-                  onCheckedChange={setIsTaxApplied}
-                />
+              <div className="space-y-2">
+                <Label>세금 유형</Label>
+                <Select
+                  value={taxType}
+                  onValueChange={(v) => setTaxType(v as TaxType)}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">세금 미적용</SelectItem>
+                    <SelectItem value="income_3.3">3.3% (소득세)</SelectItem>
+                    <SelectItem value="vat_10">10% (부가세)</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               {editWorker && (
                 <div className="space-y-2 p-3 bg-red-50 rounded-lg">
@@ -1012,10 +1021,12 @@ export default function WorkersPage() {
                       </div>
                     </TableCell>
                     <TableCell className="text-center">
-                      {worker.is_tax_applied ? (
-                        <Badge variant="secondary">3.3%</Badge>
+                      {worker.tax_type === 'none' ? (
+                        <span className="text-gray-400">-</span>
                       ) : (
-                        '-'
+                        <Badge variant="secondary">
+                          {worker.tax_type === 'income_3.3' ? '3.3%' : '10%'}
+                        </Badge>
                       )}
                     </TableCell>
                     <TableCell className="text-center">

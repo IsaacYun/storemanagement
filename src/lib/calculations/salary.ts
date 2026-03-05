@@ -79,8 +79,13 @@ export function calculateSalary(
   // 세전 급여 (baseWage에 이미 모든 항목이 시간 기준으로 포함됨)
   const grossWage = baseWage;
 
-  // 세금 계산 (3.3% 사업소득세)
-  const taxRate = worker.is_tax_applied ? 0.033 : 0;
+  // 세금 계산
+  let taxRate = 0;
+  if (worker.tax_type === 'income_3.3') {
+    taxRate = 0.033; // 3.3% 사업소득세
+  } else if (worker.tax_type === 'vat_10') {
+    taxRate = 0.10; // 10% 부가세
+  }
   const taxAmount = Math.floor(grossWage * taxRate);
 
   // 실수령액

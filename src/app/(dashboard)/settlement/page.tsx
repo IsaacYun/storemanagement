@@ -457,9 +457,9 @@ export default function SettlementPage() {
                       >
                         <TableCell className="font-medium">
                           {s.worker.name}
-                          {s.worker.is_tax_applied && (
+                          {s.worker.tax_type !== 'none' && (
                             <span className="text-xs text-gray-400 ml-1">
-                              (세금)
+                              ({s.worker.tax_type === 'income_3.3' ? '3.3%' : '10%'})
                             </span>
                           )}
                         </TableCell>
@@ -636,9 +636,9 @@ export default function SettlementPage() {
                     <span>세전급여</span>
                     <span>{formatMoney(selectedWorker.salary.grossWage)}원</span>
                   </div>
-                  {selectedWorker.worker.is_tax_applied && selectedWorker.salary.taxAmount > 0 && (
+                  {selectedWorker.worker.tax_type !== 'none' && selectedWorker.salary.taxAmount > 0 && (
                     <div className="flex justify-between text-red-500">
-                      <span>세금 (3.3%)</span>
+                      <span>세금 ({selectedWorker.worker.tax_type === 'income_3.3' ? '3.3%' : '10%'})</span>
                       <span>-{formatMoney(selectedWorker.salary.taxAmount)}원</span>
                     </div>
                   )}

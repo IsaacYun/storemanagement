@@ -12,6 +12,7 @@ export type ChangeType =
   | 'full_attendance_bonus'; // 만근수당
 
 export type UserRole = 'admin' | 'worker';
+export type TaxType = 'none' | 'income_3.3' | 'vat_10';
 export type SettlementStatus = 'draft' | 'confirmed' | 'paid';
 export type ChangeStatus = 'pending' | 'approved' | 'rejected';
 
@@ -47,7 +48,7 @@ export interface Worker {
   store_id: string;
   name: string;
   phone: string | null;
-  is_tax_applied: boolean;
+  tax_type: TaxType; // 세금 유형: none, income_3.3, vat_10
   is_active: boolean;
   resigned_at: string | null; // 퇴사일 (null이면 재직 중)
   role: UserRole;
@@ -56,6 +57,13 @@ export interface Worker {
   // Relations
   store?: Store;
 }
+
+// 세금 유형 라벨
+export const TAX_TYPE_LABELS: Record<TaxType, string> = {
+  none: '세금 미적용',
+  'income_3.3': '3.3% (소득세)',
+  vat_10: '10% (부가세)',
+};
 
 // 기본 스케줄 (주간 반복)
 export interface Schedule {

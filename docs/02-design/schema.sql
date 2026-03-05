@@ -31,7 +31,7 @@ CREATE TABLE workers (
     store_id UUID NOT NULL REFERENCES stores(id) ON DELETE RESTRICT,
     name VARCHAR(50) NOT NULL,
     phone VARCHAR(20),
-    is_tax_applied BOOLEAN DEFAULT false,
+    tax_type TEXT DEFAULT 'none' CHECK (tax_type IN ('none', 'income_3.3', 'vat_10')),
     is_active BOOLEAN DEFAULT true,
     role VARCHAR(20) DEFAULT 'worker' CHECK (role IN ('admin', 'worker')),
     created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -39,7 +39,7 @@ CREATE TABLE workers (
 );
 
 COMMENT ON TABLE workers IS '근무자 정보';
-COMMENT ON COLUMN workers.is_tax_applied IS '3.3% 사업소득세 적용 여부';
+COMMENT ON COLUMN workers.tax_type IS '세금 유형: none(미적용), income_3.3(3.3% 소득세), vat_10(10% 부가세)';
 COMMENT ON COLUMN workers.role IS 'admin: 관리자, worker: 일반 근무자';
 
 CREATE INDEX idx_workers_store_id ON workers(store_id);
