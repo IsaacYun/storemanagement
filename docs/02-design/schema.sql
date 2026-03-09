@@ -68,13 +68,14 @@ CREATE INDEX idx_schedules_store_id ON schedules(store_id);
 
 -- 1.4 변동사항 유형 ENUM
 CREATE TYPE change_type AS ENUM (
-    'absence',           -- 미근무 (근무불가)
+    'absence',           -- 미근무 (결근)
     'overtime',          -- 추가근무 (연장, 조기출근)
     'substitute',        -- 대타근무
     'late',              -- 지각
     'early_leave',       -- 조퇴
     'meal_allowance',    -- 식대
-    'weekly_holiday_pay' -- 주휴수당
+    'weekly_holiday_pay', -- 주휴수당
+    'schedule_change'    -- 시간변경
 );
 
 -- 1.5 schedule_changes (변동사항)
